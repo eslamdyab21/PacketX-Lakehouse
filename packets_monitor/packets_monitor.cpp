@@ -1,7 +1,7 @@
 #include <filesystem>
 #include <unordered_map>
+#include <array>
 #include "packets_monitor.h"
-
 
 // Define shared resources
 std::mutex queue_mutex;
@@ -22,11 +22,38 @@ void PacketsMonitor::checkNewTcpdumpDataThread() {
 
                 {
                     std::lock_guard<std::mutex> lock(queue_mutex);
-                    tcpdump_data_queue.push(entry.path());
+                    tcpdump_data_queue.push(entry.path().string());
                 }
                 queue_cond.notify_one();
             }
         }
 
     }
+}
+
+// tshark -r capture.pcap -qz io,phs
+
+// void PacketsMonitor::processNewTcpdumpTshark(std::string filePath) {
+//     // std::cout << "📡 Processing: " << filePath << std::endl;
+// std::string command = "tshark -r " + filePath + " -qz io,phs fields -e frame.number -e ip.src -e ip.dst";
+//     system(command.c_str());
+// }
+
+
+std::string PacketsMonitor::processNewTcpdumpTsharkTotalBytes(std::string filePath) {
+    std::array<char, 128> buffer;
+    std::string total_bytes;
+
+    std::string cmd = "tshark -r " + filePath + " -qz io,phs | grep 'eth' | grep 'bytes' | cut -d':' -f3";
+
+    FILE* pipe = popen(cmd.c_str(), "r");
+
+    if (!pipe) {
+        throw std::runtime_error("popen() failed!");
+    }
+
+    while (fgets(buffer.data(), buffer.size(), pipe) != nullptr) {
+        total_bytes += buffer.data();
+    }
+    return total_bytes;
 }

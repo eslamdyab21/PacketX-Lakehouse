@@ -18,6 +18,8 @@ struct packet {
 class PacketsMonitor {
 public:
     void checkNewTcpdumpDataThread();
+    std::string processNewTcpdumpTsharkTotalBytes(std::string filePath);
+    // std::string processNewTcpdumpTsharkIPBytes(std::string filePath);
 };
 
 
