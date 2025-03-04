@@ -2,7 +2,7 @@
 #include <string>
 #include <thread>
 #include <iostream>
-
+#include <cstdlib>
 
 
 void checkNewTcpdump(PacketsMonitor *Monitor) {
@@ -13,7 +13,7 @@ void checkNewTcpdump(PacketsMonitor *Monitor) {
 
 int main() {
     PacketsMonitor Monitor;
-
+    std::string total_bytes;
 
     // Check new tcpdump data thread
     std::thread checkNewTcpdumpDataThread(checkNewTcpdump, &Monitor);
@@ -28,6 +28,8 @@ int main() {
         lock.unlock();
   
         std::cout << traffic_captured_file_path << std::endl; 
+        total_bytes = Monitor.processNewTcpdumpTshark(traffic_captured_file_path);
+        std::cout << total_bytes << std::endl; 
         // Monitor.processFile(traffic_captured_file_path);
         
     }
