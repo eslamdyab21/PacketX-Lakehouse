@@ -11,25 +11,24 @@ struct packet {
     std::string source_ip;
     std::string destination_ip;
     double total_k_bytes_bandwidth_for_ip;
-    double total_k_bytes_bandwidth_for_all_ips;
 };
 
 
 class PacketsMonitor {
 public:
     void checkNewTcpdumpDataThread();
-    std::string processNewTcpdumpTsharkTotalBytes(std::string filePath);
+    void processNewTcpdumpTsharkTotalBytes(std::string filePath);
     void processNewTcpdumpTsharkIPBytes(std::string filePath);
 
-    
+
     std::unordered_map<std::string, packet> packets_hashmap;
+    double total_bytes_all_ips = 0;
+    std::mutex queue_mutex;
+    std::queue<std::string> tcpdump_data_queue;
+    std::condition_variable queue_cond;
 };
 
 
-// Define shared resources
-extern std::mutex queue_mutex;
-extern std::queue<std::string> tcpdump_data_queue;
-extern std::condition_variable queue_cond;
 
 
 

@@ -7,41 +7,38 @@
 #include "packets_monitor.h"
 
 
-// Define shared resources
-std::mutex queue_mutex;
-std::queue<std::string> tcpdump_data_queue;
-std::condition_variable queue_cond;
 
 
 void PacketsMonitor::checkNewTcpdumpDataThread() {
     std::unordered_map<std::string, int> tcp_captured_hashmap;
     std::string path = ".tcpdump";
-    std::string finished_writing_file = path + "/tcpdump_finished_writing";
     std::uintmax_t file_size;
+    bool  queue_cond_notify = false;
 
     while (true) {
         for (const auto & entry : std::filesystem::directory_iterator(path)){
+            if (entry.is_regular_file() && entry.path().extension() == ".pcap"){
 
-            file_size = std::filesystem::file_size(entry.path());
-            
-            // New tcpdump file
-            if ((tcp_captured_hashmap.count(entry.path()) == 0) && file_size > 0){
+                file_size = std::filesystem::file_size(entry.path());
+                
+                // New tcpdump file
+                if ((tcp_captured_hashmap.count(entry.path()) == 0) && file_size > 0){
+                    
+                    tcp_captured_hashmap[entry.path()] = 1;
+                    
+                    {
+                        std::lock_guard<std::mutex> lock(queue_mutex);
+                        tcpdump_data_queue.push(entry.path().string());
+                    }
 
-                // Wait for the finished writing indicator file
-                while (!std::filesystem::exists(finished_writing_file)) {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                    if (!queue_cond_notify)
+                        queue_cond_notify = true;
+                    else {
+                        queue_cond.notify_one();
+                        queue_cond_notify = false;
+                    }     
+    
                 }
-
-                tcp_captured_hashmap[entry.path()] = 1;
-
-                {
-                    std::lock_guard<std::mutex> lock(queue_mutex);
-                    tcpdump_data_queue.push(entry.path().string());
-                }
-                queue_cond.notify_one();
-
-                // Remove the finished writing indicator file
-                std::filesystem::remove(finished_writing_file);
             }
         }
         std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -50,8 +47,8 @@ void PacketsMonitor::checkNewTcpdumpDataThread() {
 
 
 
-std::string PacketsMonitor::processNewTcpdumpTsharkTotalBytes(std::string filePath) {
-    std::array<char, 128> buffer;
+void PacketsMonitor::processNewTcpdumpTsharkTotalBytes(std::string filePath) {
+    std::array<char, 512> buffer;
     std::string total_bytes;
 
     std::string cmd = "tshark -r " + filePath + " -qz io,phs | grep 'eth' | grep 'bytes' | cut -d':' -f3";
@@ -65,7 +62,9 @@ std::string PacketsMonitor::processNewTcpdumpTsharkTotalBytes(std::string filePa
     while (fgets(buffer.data(), buffer.size(), pipe) != nullptr) {
         total_bytes += buffer.data();
     }
-    return total_bytes;
+
+    if (!total_bytes.empty())
+        total_bytes_all_ips += std::stoi(total_bytes) / 1024;
 }
 
 
@@ -84,8 +83,6 @@ void PacketsMonitor::processNewTcpdumpTsharkIPBytes(std::string filePath) {
     }
     
     while (fgets(buffer.data(), buffer.size(), pipe) != nullptr) {
-        // std::cout << "buffer.data()" << std::endl;
-        // std::cout << buffer.data() << std::endl;
         std::istringstream iss(buffer.data());
 
         // Extract IPs
@@ -113,8 +110,6 @@ void PacketsMonitor::processNewTcpdumpTsharkIPBytes(std::string filePath) {
         std::getline(iss, temp, ' '); // Read Bytes or k bytes
         if (temp == "bytes")
             total_bytes = total_bytes / 1024;
-
-        // result += buffer.data();
         
         if (packets_hashmap.count(key) == 0){
             packets_hashmap[key].source_ip = ip1;
