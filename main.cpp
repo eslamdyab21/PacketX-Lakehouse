@@ -4,6 +4,8 @@
 #include <iostream>
 #include <cstdlib>
 #include <iomanip>
+#include <filesystem>
+
 
 
 void checkNewTcpdump(PacketsMonitor *Monitor) {
@@ -16,6 +18,19 @@ void periodicSave(PacketsMonitor *Monitor, std::string filename) {
     while (true) {
         std::this_thread::sleep_for(std::chrono::minutes(1));
         Monitor->saveToCSV(filename);
+    }
+}
+
+
+
+void periodicDelete(PacketsMonitor *Monitor) {
+    while (true) {
+        std::this_thread::sleep_for(std::chrono::minutes(1));
+        
+        for (auto kv : Monitor->tcp_captured_hashmap) {
+            if (kv.second == 1) 
+                std::filesystem::remove(kv.first);
+        }
     }
 }
 
@@ -45,20 +60,22 @@ void formatted_print(PacketsMonitor *Monitor){
 
 
 
-
 int main() {
     PacketsMonitor Monitor;
     std::string total_bytes;
     std::unordered_map<std::string, packet>* packets_hashmap;
 
-    // Get previously saved traffic to accumulate on
+    // Get previously saved traffic to accumulate on it
     Monitor.loadFromCSV("traffic_log.csv");
 
     // Check new tcpdump data thread
-    std::thread checkNewTcpdumpDataThread(checkNewTcpdump, &Monitor);
+    std::thread check_new_tcpdump_data_thread(checkNewTcpdump, &Monitor);
 
     // Periodic save thread
     std::thread save_thread(periodicSave, &Monitor, "traffic_log.csv");
+
+    // Periodic delete thread
+    std::thread delete_thread(periodicDelete, &Monitor);
 
 
     // Process new tcpdump data main thread
