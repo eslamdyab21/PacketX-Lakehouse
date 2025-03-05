@@ -1,7 +1,10 @@
 #include <filesystem>
 #include <unordered_map>
 #include <array>
+#include <iostream>
+#include <algorithm>
 #include "packets_monitor.h"
+
 
 // Define shared resources
 std::mutex queue_mutex;
@@ -31,13 +34,6 @@ void PacketsMonitor::checkNewTcpdumpDataThread() {
     }
 }
 
-// tshark -r capture.pcap -qz io,phs
-
-// void PacketsMonitor::processNewTcpdumpTshark(std::string filePath) {
-//     // std::cout << "📡 Processing: " << filePath << std::endl;
-// std::string command = "tshark -r " + filePath + " -qz io,phs fields -e frame.number -e ip.src -e ip.dst";
-//     system(command.c_str());
-// }
 
 
 std::string PacketsMonitor::processNewTcpdumpTsharkTotalBytes(std::string filePath) {
@@ -56,4 +52,64 @@ std::string PacketsMonitor::processNewTcpdumpTsharkTotalBytes(std::string filePa
         total_bytes += buffer.data();
     }
     return total_bytes;
+}
+
+
+void PacketsMonitor::processNewTcpdumpTsharkIPBytes(std::string filePath) {
+    std::array<char, 1024> buffer;
+    std::string temp;
+    std::string ip1, ip2, key;
+    double total_bytes;
+    
+    std::string cmd = "tshark -r " + filePath + " -q -z conv,ip | grep '<->' | sed 's/[[:space:]]\\+/ /g'";
+    
+    FILE* pipe = popen(cmd.c_str(), "r");
+    
+    if (!pipe) {
+        throw std::runtime_error("popen() failed!");
+    }
+    
+    while (fgets(buffer.data(), buffer.size(), pipe) != nullptr) {
+        // std::cout << "buffer.data()" << std::endl;
+        // std::cout << buffer.data() << std::endl;
+        std::istringstream iss(buffer.data());
+
+        // Extract IPs
+        std::getline(iss, ip1, ' ');  // Read first IP
+        std::getline(iss, temp, ' '); // Read "<->"
+        std::getline(iss, ip2, ' ');  // Read second IP
+
+        // Persist key arrangement
+        // Treat (172.29.0.1, 172.29.1.167) same as (172.29.1.167, 172.29.0.1) in the hashmap
+        if (ip1 < ip2){
+            temp = ip1;
+            ip1 = ip2;
+            ip2 = temp; 
+        }
+        key = ip1 + "-" + ip2;
+
+
+        // Skip
+        for (int i=0; i < 7; i++)
+            std::getline(iss, temp, ' ');
+        
+        std::getline(iss, temp, ' ');
+        total_bytes = std::stoi(temp); // Read total bytes
+
+        std::getline(iss, temp, ' '); // Read Bytes or k bytes
+        if (temp == "bytes")
+            total_bytes = total_bytes / 1024;
+
+        // result += buffer.data();
+        
+        if (packets_hashmap.count(key) == 0){
+            packets_hashmap[key].source_ip = ip1;
+            packets_hashmap[key].destination_ip = ip2;
+            packets_hashmap[key].total_k_bytes_bandwidth_for_ip = total_bytes;
+        }
+        else 
+            packets_hashmap[key].total_k_bytes_bandwidth_for_ip += total_bytes;
+        
+    }
+
 }

@@ -5,7 +5,7 @@
 #include <queue>
 #include <fstream>
 #include <condition_variable>
-
+#include <unordered_map>
 
 struct packet {
     std::string source_ip;
@@ -19,7 +19,10 @@ class PacketsMonitor {
 public:
     void checkNewTcpdumpDataThread();
     std::string processNewTcpdumpTsharkTotalBytes(std::string filePath);
-    // std::string processNewTcpdumpTsharkIPBytes(std::string filePath);
+    void processNewTcpdumpTsharkIPBytes(std::string filePath);
+
+    
+    std::unordered_map<std::string, packet> packets_hashmap;
 };
 
 
