@@ -24,8 +24,10 @@ public:
 
 
 
+    std::unordered_map<std::string, int> tcp_captured_hashmap;
     std::unordered_map<std::string, packet> packets_hashmap;
     double total_bytes_all_ips = 0;
+    
     std::mutex queue_mutex;
     std::queue<std::string> tcpdump_data_queue;
     std::condition_variable queue_cond;
