@@ -19,6 +19,9 @@ public:
     void checkNewTcpdumpDataThread();
     void processNewTcpdumpTsharkTotalBytes(std::string filePath);
     void processNewTcpdumpTsharkIPBytes(std::string filePath);
+    void saveToCSV(std::string filename);
+    void loadFromCSV(std::string filename);
+
 
 
     std::unordered_map<std::string, packet> packets_hashmap;

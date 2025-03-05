@@ -64,7 +64,7 @@ void PacketsMonitor::processNewTcpdumpTsharkTotalBytes(std::string filePath) {
     }
 
     if (!total_bytes.empty())
-        total_bytes_all_ips += std::stoi(total_bytes) / 1024;
+        total_bytes_all_ips += std::stod(total_bytes) / 1024;
 }
 
 
@@ -121,4 +121,66 @@ void PacketsMonitor::processNewTcpdumpTsharkIPBytes(std::string filePath) {
         
     }
 
+}
+
+
+
+void PacketsMonitor::saveToCSV(std::string filename) {
+    std::ofstream file(filename, std::ios::trunc); // overwrite mode
+
+    if (!file) {
+        std::cerr << "Error opening file for writing!\n";
+        return;
+    }
+
+    // Header
+    file << "Source IP,Destination IP,KB Bandwidth,Total KB Bandwidth\n";
+
+    // Data
+    for (const auto& kv : packets_hashmap) {
+        file << kv.second.source_ip << "," 
+             << kv.second.destination_ip << ","
+             << kv.second.total_k_bytes_bandwidth_for_ip << ","
+             << total_bytes_all_ips << "\n";
+    }
+
+    file.close();
+}
+
+
+
+
+void PacketsMonitor::loadFromCSV(std::string filename) {
+    std::ifstream file(filename);
+    bool firstLine = true;
+    std::string line;
+
+
+    if (!file && !std::filesystem::exists(filename)) {
+        std::cerr << "No file for reading!\n";
+        return;
+    }
+
+    while (std::getline(file, line)) {
+        if (firstLine) { 
+            firstLine = false; // Skip header line
+            continue;
+        }
+
+        std::istringstream iss(line);
+        packet p;
+        std::string bandwidth, total_bandwidth;
+
+        std::getline(iss, p.source_ip, ',');
+        std::getline(iss, p.destination_ip, ',');
+        std::getline(iss, bandwidth, ',');
+        std::getline(iss, total_bandwidth, ',');
+
+        p.total_k_bytes_bandwidth_for_ip = std::stod(bandwidth);
+        std::string key = p.source_ip + "-" + p.destination_ip;
+        packets_hashmap[key] = p;
+        total_bytes_all_ips = std::stod(total_bandwidth);
+    }
+
+    file.close();
 }
