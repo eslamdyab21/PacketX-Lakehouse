@@ -3,6 +3,7 @@
 #include <array>
 #include <iostream>
 #include <algorithm>
+#include <thread>
 #include "packets_monitor.h"
 
 
@@ -15,12 +16,22 @@ std::condition_variable queue_cond;
 void PacketsMonitor::checkNewTcpdumpDataThread() {
     std::unordered_map<std::string, int> tcp_captured_hashmap;
     std::string path = ".tcpdump";
+    std::string finished_writing_file = path + "/tcpdump_finished_writing";
+    std::uintmax_t file_size;
 
     while (true) {
         for (const auto & entry : std::filesystem::directory_iterator(path)){
 
+            file_size = std::filesystem::file_size(entry.path());
+            
             // New tcpdump file
-            if (tcp_captured_hashmap.count(entry.path()) == 0){
+            if ((tcp_captured_hashmap.count(entry.path()) == 0) && file_size > 0){
+
+                // Wait for the finished writing indicator file
+                while (!std::filesystem::exists(finished_writing_file)) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                }
+
                 tcp_captured_hashmap[entry.path()] = 1;
 
                 {
@@ -28,9 +39,12 @@ void PacketsMonitor::checkNewTcpdumpDataThread() {
                     tcpdump_data_queue.push(entry.path().string());
                 }
                 queue_cond.notify_one();
+
+                // Remove the finished writing indicator file
+                std::filesystem::remove(finished_writing_file);
             }
         }
-
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 }
 
