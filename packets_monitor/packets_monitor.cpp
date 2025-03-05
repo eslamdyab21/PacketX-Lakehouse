@@ -12,7 +12,6 @@
 void PacketsMonitor::checkNewTcpdumpDataThread() {
     std::string path = ".tcpdump";
     std::uintmax_t file_size;
-    bool queue_cond_notify = false;
 
     while (true) {
         for (const auto & entry : std::filesystem::directory_iterator(path)){
@@ -29,20 +28,12 @@ void PacketsMonitor::checkNewTcpdumpDataThread() {
                         std::lock_guard<std::mutex> lock(queue_mutex);
                         tcpdump_data_queue.push(entry.path().string());
                     }
-
-                    if (!queue_cond_notify)
-                        queue_cond_notify = true;
-                    else {
-                        tcp_captured_hashmap[tcpdump_data_queue.front()] = 1;
-                        queue_cond.notify_one();
-                        queue_cond_notify = false;
-
-                    }     
+                    queue_cond.notify_one();     
     
                 }
             }
         }
-        // std::this_thread::sleep_for(std::chrono::seconds(1));
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 }
 

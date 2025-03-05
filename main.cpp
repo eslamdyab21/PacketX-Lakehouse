@@ -5,7 +5,7 @@
 #include <cstdlib>
 #include <iomanip>
 #include <filesystem>
-
+#include <algorithm>
 
 
 void checkNewTcpdump(PacketsMonitor *Monitor) {
@@ -37,6 +37,13 @@ void periodicDelete(PacketsMonitor *Monitor) {
 
 
 void formatted_print(PacketsMonitor *Monitor){
+    std::vector<std::pair<std::string, packet>> sorted_entries(Monitor->packets_hashmap.begin(), Monitor->packets_hashmap.end());
+    
+    std::sort(sorted_entries.begin(), sorted_entries.end(),
+        [](const auto &a, const auto &b) {
+            return a.second.total_k_bytes_bandwidth_for_ip > b.second.total_k_bytes_bandwidth_for_ip;
+    });
+
     std::cout << std::left
     << std::setw(30) << "Source IP"
     << std::setw(30) << "Destination IP"
@@ -46,13 +53,17 @@ void formatted_print(PacketsMonitor *Monitor){
 
     std::cout << std::string(100, '-') << "\n";
 
-    for (auto kv : Monitor->packets_hashmap) {
-    std::cout << std::left
-        << std::setw(30) << kv.second.source_ip
-        << std::setw(30) << kv.second.destination_ip
-        << std::setw(20) << kv.second.total_k_bytes_bandwidth_for_ip
-        << std::setw(20) << Monitor->total_bytes_all_ips
-        << "\n";
+    int count = 0;
+    for (auto kv : sorted_entries) {
+        if (count >= 15) break;
+
+        std::cout << std::left
+            << std::setw(30) << kv.second.source_ip
+            << std::setw(30) << kv.second.destination_ip
+            << std::setw(20) << kv.second.total_k_bytes_bandwidth_for_ip
+            << std::setw(20) << Monitor->total_bytes_all_ips
+            << "\n";
+        count++;
     }
 
     std::cout << std::string(100, '-') << std::endl;
@@ -81,8 +92,8 @@ int main() {
     // Process new tcpdump data main thread
     while (true) {
         std::unique_lock<std::mutex> lock(Monitor.queue_mutex);
-        // Monitor.queue_cond.wait(lock, [&] { return !Monitor.tcpdump_data_queue.empty(); });
-        Monitor.queue_cond.wait(lock);
+        Monitor.queue_cond.wait(lock, [&] { return Monitor.tcpdump_data_queue.size() > 2; });
+        // Monitor.queue_cond.wait(lock);
 
         std::string traffic_captured_file_path = Monitor.tcpdump_data_queue.front();
         Monitor.tcpdump_data_queue.pop();
@@ -91,10 +102,12 @@ int main() {
         Monitor.processNewTcpdumpTsharkTotalBytes(traffic_captured_file_path);
         
         Monitor.processNewTcpdumpTsharkIPBytes(traffic_captured_file_path);
-        
-                
-        std::cout << traffic_captured_file_path << std::endl;
 
+        Monitor.tcp_captured_hashmap[traffic_captured_file_path] = 1; // 1: file can be deleted
+        
+
+        // print status
+        std::cout << traffic_captured_file_path << std::endl;
         formatted_print(&Monitor);
     }
 
