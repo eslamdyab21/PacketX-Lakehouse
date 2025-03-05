@@ -21,6 +21,31 @@ void periodicSave(PacketsMonitor *Monitor, std::string filename) {
 
 
 
+void formatted_print(PacketsMonitor *Monitor){
+    std::cout << std::left
+    << std::setw(30) << "Source IP"
+    << std::setw(30) << "Destination IP"
+    << std::setw(20) << "KB Bandwidth"
+    << std::setw(20) << "Total KB Bandwidth"
+    << "\n";
+
+    std::cout << std::string(100, '-') << "\n";
+
+    for (auto kv : Monitor->packets_hashmap) {
+    std::cout << std::left
+        << std::setw(30) << kv.second.source_ip
+        << std::setw(30) << kv.second.destination_ip
+        << std::setw(20) << kv.second.total_k_bytes_bandwidth_for_ip
+        << std::setw(20) << Monitor->total_bytes_all_ips
+        << "\n";
+    }
+
+    std::cout << std::string(100, '-') << std::endl;
+}
+
+
+
+
 int main() {
     PacketsMonitor Monitor;
     std::string total_bytes;
@@ -53,6 +78,7 @@ int main() {
                 
         std::cout << traffic_captured_file_path << std::endl;
 
+        formatted_print(&Monitor);
     }
 
     return 0;
