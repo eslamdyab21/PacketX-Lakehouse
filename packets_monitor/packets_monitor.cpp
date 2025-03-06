@@ -5,11 +5,13 @@
 #include <algorithm>
 #include <thread>
 #include "packets_monitor.h"
-
+#include "../logger/logger.h"
 
 
 
 void PacketsMonitor::checkNewTcpdumpDataThread() {
+    logMessage("INFO","PacketsMonitor::checkNewTcpdumpDataThread");
+
     std::string path = ".tcpdump";
     std::uintmax_t file_size;
 
@@ -21,14 +23,16 @@ void PacketsMonitor::checkNewTcpdumpDataThread() {
                 
                 // New tcpdump file
                 if ((tcp_captured_hashmap.count(entry.path()) == 0) && file_size > 0){
-                    
+                    logMessage("INFO","PacketsMonitor::checkNewTcpdumpDataThread -> Found A New File");
+
                     tcp_captured_hashmap[entry.path()] = 0;
                     
                     {
                         std::lock_guard<std::mutex> lock(queue_mutex);
                         tcpdump_data_queue.push(entry.path().string());
                     }
-                    queue_cond.notify_one();     
+                    queue_cond.notify_one();
+                    logMessage("INFO","PacketsMonitor::checkNewTcpdumpDataThread -> Pushed New File To Queue");
     
                 }
             }
@@ -40,6 +44,8 @@ void PacketsMonitor::checkNewTcpdumpDataThread() {
 
 
 void PacketsMonitor::processNewTcpdumpTsharkTotalBytes(std::string filePath) {
+    logMessage("INFO","PacketsMonitor::processNewTcpdumpTsharkTotalBytes");
+
     std::array<char, 512> buffer;
     std::string total_bytes;
 
@@ -57,10 +63,14 @@ void PacketsMonitor::processNewTcpdumpTsharkTotalBytes(std::string filePath) {
 
     if (!total_bytes.empty())
         total_bytes_all_ips += std::stod(total_bytes) / 1024;
+    
+    logMessage("INFO","PacketsMonitor::processNewTcpdumpTsharkTotalBytes -> Executed Tshark Total Bytes CMD");
 }
 
 
 void PacketsMonitor::processNewTcpdumpTsharkIPBytes(std::string filePath) {
+    logMessage("INFO","PacketsMonitor::processNewTcpdumpTsharkIPBytes");
+
     std::array<char, 1024> buffer;
     std::string temp;
     std::string ip1, ip2, key;
@@ -113,15 +123,18 @@ void PacketsMonitor::processNewTcpdumpTsharkIPBytes(std::string filePath) {
         
     }
 
+    logMessage("INFO","PacketsMonitor::processNewTcpdumpTsharkIPBytes -> Executed Tshark Total Bytes/IP CMD");
 }
 
 
 
 void PacketsMonitor::saveToCSV(std::string filename) {
+    logMessage("INFO","PacketsMonitor::saveToCSV");
+
     std::ofstream file(filename, std::ios::trunc); // overwrite mode
 
     if (!file) {
-        std::cerr << "Error opening file for writing!\n";
+        logMessage("INFO","PacketsMonitor::saveToCSV -> Error opening file for writing!");
         return;
     }
 
@@ -137,19 +150,23 @@ void PacketsMonitor::saveToCSV(std::string filename) {
     }
 
     file.close();
+
+    logMessage("INFO","PacketsMonitor::saveToCSV -> Done");
 }
 
 
 
 
 void PacketsMonitor::loadFromCSV(std::string filename) {
+    logMessage("INFO","PacketsMonitor::loadFromCSV");
+
     std::ifstream file(filename);
     bool firstLine = true;
     std::string line;
 
 
     if (!file && !std::filesystem::exists(filename)) {
-        std::cerr << "No file for reading!\n";
+        logMessage("INFO","PacketsMonitor::loadFromCSV -> Can't Open File");
         return;
     }
 
@@ -175,4 +192,6 @@ void PacketsMonitor::loadFromCSV(std::string filename) {
     }
 
     file.close();
+
+    logMessage("INFO","PacketsMonitor::loadFromCSV -> Done");
 }
