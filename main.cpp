@@ -1,4 +1,5 @@
 #include "packets_monitor/packets_monitor.h"
+#include "logger/logger.h"
 #include <string>
 #include <thread>
 #include <iostream>
@@ -9,21 +10,29 @@
 
 
 void checkNewTcpdump(PacketsMonitor *Monitor) {
+    logMessage("INFO","Main::checkNewTcpdump -> Start Thread");
+
     Monitor->checkNewTcpdumpDataThread();
 }
 
 
 
 void periodicSave(PacketsMonitor *Monitor, std::string filename) {
+    logMessage("INFO","Main::periodicSave -> Start Thread");
+
     while (true) {
         std::this_thread::sleep_for(std::chrono::minutes(1));
         Monitor->saveToCSV(filename);
+
+        logMessage("INFO","Main::periodicSave -> Saved Processed Traffic");
     }
 }
 
 
 
 void periodicDelete(PacketsMonitor *Monitor) {
+    logMessage("INFO","Main::periodicDelete -> Start Thread");
+
     while (true) {
         std::this_thread::sleep_for(std::chrono::minutes(1));
         
@@ -31,12 +40,16 @@ void periodicDelete(PacketsMonitor *Monitor) {
             if (kv.second == 1) 
                 std::filesystem::remove(kv.first);
         }
+
+        logMessage("INFO","Main::periodicDelete -> Delted Processed Files");
     }
 }
 
 
 
 void formatted_print(PacketsMonitor *Monitor){
+    logMessage("INFO","Main::formatted_print");
+
     std::vector<std::pair<std::string, packet>> sorted_entries(Monitor->packets_hashmap.begin(), Monitor->packets_hashmap.end());
     
     std::sort(sorted_entries.begin(), sorted_entries.end(),
@@ -67,6 +80,8 @@ void formatted_print(PacketsMonitor *Monitor){
     }
 
     std::cout << std::string(100, '-') << std::endl;
+
+    logMessage("INFO","Main::formatted_print -> Done");
 }
 
 
@@ -89,6 +104,8 @@ int main() {
     std::thread delete_thread(periodicDelete, &Monitor);
 
 
+    logMessage("INFO","Main -> Start Main Thread");
+
     // Process new tcpdump data main thread
     while (true) {
         std::unique_lock<std::mutex> lock(Monitor.queue_mutex);
@@ -107,7 +124,6 @@ int main() {
         
 
         // print status
-        std::cout << traffic_captured_file_path << std::endl;
         formatted_print(&Monitor);
     }
 
