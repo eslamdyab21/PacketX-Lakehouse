@@ -125,6 +125,8 @@ int main() {
 
         // print status
         formatted_print(&Monitor);
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 
     return 0;
