@@ -31,6 +31,8 @@ public:
     std::mutex queue_mutex;
     std::queue<std::string> tcpdump_data_queue;
     std::condition_variable queue_cond;
+
+    std::mutex file_mutex;
 };
 
 
