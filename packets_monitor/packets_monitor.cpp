@@ -16,28 +16,31 @@ void PacketsMonitor::checkNewTcpdumpDataThread() {
     std::uintmax_t file_size;
 
     while (true) {
-        for (const auto & entry : std::filesystem::directory_iterator(path)){
-            if (entry.is_regular_file() && entry.path().extension() == ".pcap"){
+        {
+            std::lock_guard<std::mutex> lock(file_mutex); // Prevent checking while deleting
+            for (const auto & entry : std::filesystem::directory_iterator(path)){
+                if (entry.is_regular_file() && entry.path().extension() == ".pcap"){
 
-                file_size = std::filesystem::file_size(entry.path());
-                
-                // New tcpdump file
-                if ((tcp_captured_hashmap.count(entry.path()) == 0) && file_size > 0){
-                    logMessage("INFO","PacketsMonitor::checkNewTcpdumpDataThread -> Found A New File");
-
-                    tcp_captured_hashmap[entry.path()] = 0;
+                    file_size = std::filesystem::file_size(entry.path());
                     
-                    {
-                        std::lock_guard<std::mutex> lock(queue_mutex);
-                        tcpdump_data_queue.push(entry.path().string());
+                    // New tcpdump file
+                    if ((tcp_captured_hashmap.count(entry.path()) == 0) && file_size > 0){
+                        logMessage("INFO","PacketsMonitor::checkNewTcpdumpDataThread -> Found A New File");
+
+                        tcp_captured_hashmap[entry.path()] = 0;
+                        
+                        {
+                            std::lock_guard<std::mutex> lock(queue_mutex);
+                            tcpdump_data_queue.push(entry.path().string());
+                        }
+                        queue_cond.notify_one();
+                        logMessage("INFO","PacketsMonitor::checkNewTcpdumpDataThread -> Pushed New File To Queue");
+        
                     }
-                    queue_cond.notify_one();
-                    logMessage("INFO","PacketsMonitor::checkNewTcpdumpDataThread -> Pushed New File To Queue");
-    
                 }
             }
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        } // Unlock
     }
 }
 
@@ -62,7 +65,7 @@ void PacketsMonitor::processNewTcpdumpTsharkTotalBytes(std::string filePath) {
     }
 
     if (!total_bytes.empty())
-        total_bytes_all_ips += std::stod(total_bytes) / 1024;
+        total_bytes_all_ips += (std::stod(total_bytes) / 8) / 1024; 
     
     pclose(pipe);
     logMessage("INFO","PacketsMonitor::processNewTcpdumpTsharkTotalBytes -> Executed Tshark Total Bytes CMD");
@@ -112,7 +115,7 @@ void PacketsMonitor::processNewTcpdumpTsharkIPBytes(std::string filePath) {
 
         std::getline(iss, temp, ' '); // Read Bytes or k bytes
         if (temp == "bytes")
-            // total_bytes = total_bytes / 1024;
+            total_bytes = total_bytes / 1024;
         
         if (packets_hashmap.count(key) == 0){
             packets_hashmap[key].source_ip = ip1;

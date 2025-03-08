@@ -36,12 +36,16 @@ void periodicDelete(PacketsMonitor *Monitor) {
     while (true) {
         std::this_thread::sleep_for(std::chrono::minutes(1));
         
-        for (auto kv : Monitor->tcp_captured_hashmap) {
-            if (kv.second == 1) 
-                std::filesystem::remove(kv.first);
-        }
+        {
+            std::lock_guard<std::mutex> lock(Monitor->file_mutex); // Lock while deleting
+            for (auto kv : Monitor->tcp_captured_hashmap) {
+                if (kv.second == 1) {
+                    std::filesystem::remove(kv.first);
+                }
+            }
+        } // Unlock after deletion
 
-        logMessage("INFO","Main::periodicDelete -> Delted Processed Files");
+        logMessage("INFO","Main::periodicDelete -> Deleted Processed Files");
     }
 }
 
