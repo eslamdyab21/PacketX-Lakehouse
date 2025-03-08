@@ -37,14 +37,14 @@ void PacketsMonitor::checkNewTcpdumpDataThread() {
                 }
             }
         }
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 }
 
 
 
 void PacketsMonitor::processNewTcpdumpTsharkTotalBytes(std::string filePath) {
-    logMessage("INFO","PacketsMonitor::processNewTcpdumpTsharkTotalBytes");
+    logMessage("INFO","PacketsMonitor::processNewTcpdumpTsharkTotalBytes -> " + filePath);
 
     std::array<char, 512> buffer;
     std::string total_bytes;
@@ -64,12 +64,13 @@ void PacketsMonitor::processNewTcpdumpTsharkTotalBytes(std::string filePath) {
     if (!total_bytes.empty())
         total_bytes_all_ips += std::stod(total_bytes) / 1024;
     
+    pclose(pipe);
     logMessage("INFO","PacketsMonitor::processNewTcpdumpTsharkTotalBytes -> Executed Tshark Total Bytes CMD");
 }
 
 
 void PacketsMonitor::processNewTcpdumpTsharkIPBytes(std::string filePath) {
-    logMessage("INFO","PacketsMonitor::processNewTcpdumpTsharkIPBytes");
+    logMessage("INFO","PacketsMonitor::processNewTcpdumpTsharkIPBytes -> " + filePath);
 
     std::array<char, 1024> buffer;
     std::string temp;
@@ -111,7 +112,7 @@ void PacketsMonitor::processNewTcpdumpTsharkIPBytes(std::string filePath) {
 
         std::getline(iss, temp, ' '); // Read Bytes or k bytes
         if (temp == "bytes")
-            total_bytes = total_bytes / 1024;
+            // total_bytes = total_bytes / 1024;
         
         if (packets_hashmap.count(key) == 0){
             packets_hashmap[key].source_ip = ip1;
@@ -123,6 +124,7 @@ void PacketsMonitor::processNewTcpdumpTsharkIPBytes(std::string filePath) {
         
     }
 
+    pclose(pipe);
     logMessage("INFO","PacketsMonitor::processNewTcpdumpTsharkIPBytes -> Executed Tshark Total Bytes/IP CMD");
 }
 
