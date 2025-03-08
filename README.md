@@ -1,4 +1,4 @@
-![](images/packetx.png)
+![](images/packetx1.png)
 
 # **📡 Introduction**
 PacketX is a **lightweight high-performance software** for real-time capturing and analyzing network traffic. This project leverages `linux`, `tcpdump`, `tshark`, `bash` and `c++` to inspect network packets and identify high-bandwidth applications utilizing **multithreaded C++, **mutex-controlled data synchronization**, **managing local files,** and **automated build** using **Makefiles**.
@@ -22,7 +22,7 @@ PacketX is a **lightweight high-performance software** for real-time capturing a
 
 <br/>
 
-## **🚀 How To Run**
+## **🎬 How To Run**
 - Install `tcpdump` and `tshark` if not already.
 ```bash
 sudo apt install tcpdump tshark
