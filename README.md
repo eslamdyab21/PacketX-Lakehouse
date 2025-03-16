@@ -52,6 +52,6 @@ sudo ./tcpdump_capture.sh wlp8s0 10
 <br/>
 
 ## **🚀 State Saving**
-The processed captured traffic is saved in a csv file `traffic_log.csv`, the program will use this data a starting point if the file exists.
+The processed captured traffic is saved in a csv file `traffic_log.csv`, the program will use this data as a starting point if the file exists.
 
-![](images/state.png)
+![](images/state2.png)
