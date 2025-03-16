@@ -65,7 +65,7 @@ void PacketsMonitor::processNewTcpdumpTsharkTotalBytes(std::string filePath) {
     }
 
     if (!total_bytes.empty())
-        total_bytes_all_ips += (std::stod(total_bytes) / 8) / 1024; 
+        total_bytes_all_ips += (std::stod(total_bytes)) / 1024; 
     
     pclose(pipe);
     logMessage("INFO","PacketsMonitor::processNewTcpdumpTsharkTotalBytes -> Executed Tshark Total Bytes CMD");
@@ -136,19 +136,29 @@ void PacketsMonitor::processNewTcpdumpTsharkIPBytes(std::string filePath) {
 void PacketsMonitor::saveToCSV(std::string filename) {
     logMessage("INFO","PacketsMonitor::saveToCSV");
 
-    std::ofstream file(filename, std::ios::trunc); // overwrite mode
+    bool file_exists = std::filesystem::exists(filename);
+
+    std::ofstream file(filename, std::ios::app); // append mode
 
     if (!file) {
         logMessage("INFO","PacketsMonitor::saveToCSV -> Error opening file for writing!");
         return;
     }
 
-    // Header
-    file << "Source IP,Destination IP,KB Bandwidth,Total KB Bandwidth\n";
+    // Get current time
+    std::time_t now = std::time(nullptr);
+    char timeStr[20];
+    std::strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M", std::localtime(&now));
 
+    // Header
+    if (!file_exists)
+        file << "Time Stamp,Source IP,Destination IP,KB Bandwidth,Total KB Bandwidth\n";
+
+    
     // Data
     for (const auto& kv : packets_hashmap) {
-        file << kv.second.source_ip << "," 
+        file << timeStr << "," 
+             << kv.second.source_ip << "," 
              << kv.second.destination_ip << ","
              << kv.second.total_k_bytes_bandwidth_for_ip << ","
              << total_bytes_all_ips << "\n";
@@ -185,6 +195,7 @@ void PacketsMonitor::loadFromCSV(std::string filename) {
         packet p;
         std::string bandwidth, total_bandwidth;
 
+        std::getline(iss, p.source_ip, ','); // skip timestamp
         std::getline(iss, p.source_ip, ',');
         std::getline(iss, p.destination_ip, ',');
         std::getline(iss, bandwidth, ',');
