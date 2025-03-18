@@ -133,8 +133,26 @@ void PacketsMonitor::processNewTcpdumpTsharkIPBytes(std::string filePath) {
 
 
 
-void PacketsMonitor::saveToCSV(std::string filename) {
+void PacketsMonitor::saveToCSV(std::string base_dir) {
     logMessage("INFO","PacketsMonitor::saveToCSV");
+    
+    // Get current time
+    char timeStr[20];
+    char dateStr[20];
+    std::time_t now = std::time(nullptr);
+    std::strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M", std::localtime(&now));
+    std::strftime(dateStr, sizeof(dateStr), "%Y-%m-%d", std::localtime(&now));
+
+    std::string filename = base_dir + "/" + dateStr + ".csv";
+    
+    // Create directory if it doesn’t exist
+    try {
+        std::filesystem::create_directories(base_dir);
+    } 
+    catch (const std::filesystem::filesystem_error& e) {
+        logMessage("ERROR", "PacketsMonitor::saveToCSV -> Failed to create directory: " + std::string(e.what()));
+        return;
+    }
 
     bool file_exists = std::filesystem::exists(filename);
 
@@ -145,10 +163,7 @@ void PacketsMonitor::saveToCSV(std::string filename) {
         return;
     }
 
-    // Get current time
-    std::time_t now = std::time(nullptr);
-    char timeStr[20];
-    std::strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M", std::localtime(&now));
+    
 
     // Header
     if (!file_exists)
@@ -166,14 +181,25 @@ void PacketsMonitor::saveToCSV(std::string filename) {
 
     file.close();
 
-    logMessage("INFO","PacketsMonitor::saveToCSV -> Done");
+    // clear previous minute packets data
+    packets_hashmap.clear(); 
+    total_bytes_all_ips = 0;
+
+    logMessage("INFO","PacketsMonitor::saveToCSV -> " + filename + " Done");
 }
 
 
 
 
-void PacketsMonitor::loadFromCSV(std::string filename) {
+void PacketsMonitor::loadFromCSV(std::string base_dir) {
     logMessage("INFO","PacketsMonitor::loadFromCSV");
+
+    // Get current time
+    char dateStr[20];
+    std::time_t now = std::time(nullptr);
+    std::strftime(dateStr, sizeof(dateStr), "%Y-%m-%d", std::localtime(&now));
+
+    std::string filename = base_dir + "/" + dateStr + ".csv";
 
     std::ifstream file(filename);
     bool firstLine = true;
