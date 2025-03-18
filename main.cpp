@@ -96,13 +96,13 @@ int main() {
     std::unordered_map<std::string, packet>* packets_hashmap;
 
     // Get previously saved traffic to accumulate on it
-    Monitor.loadFromCSV("traffic_log.csv");
+    Monitor.loadFromCSV("traffic_log");
 
     // Check new tcpdump data thread
     std::thread check_new_tcpdump_data_thread(checkNewTcpdump, &Monitor);
 
     // Periodic save thread
-    std::thread save_thread(periodicSave, &Monitor, "traffic_log.csv");
+    std::thread save_thread(periodicSave, &Monitor, "traffic_log");
 
     // Periodic delete thread
     std::thread delete_thread(periodicDelete, &Monitor);
