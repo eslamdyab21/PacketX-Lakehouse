@@ -1,7 +1,8 @@
 import boto3
 from dotenv import load_dotenv
 import logging
-from zipfile import ZipFile, ZIP_DEFLATED
+import gzip
+import shutil
 from datetime import date
 import os
 
@@ -33,14 +34,15 @@ def upload_file_to_s3(file_path, bucket_name, object_key):
 def compress_file(local_file_path):
     logging.info(f"""compress_file""")
 
-    zip_local_file_path = local_file_path.replace('.csv', '.zip')
+    gz_local_file_path = local_file_path.replace('.csv', '.gz')
 
-    with ZipFile(zip_local_file_path, 'w', ZIP_DEFLATED) as zip:
-        zip.write(local_file_path)
+    with open(local_file_path, "rb") as f_in:
+        with gzip.open(gz_local_file_path, "wb") as f_out:
+            shutil.copyfileobj(f_in, f_out)
     
 
-    logging.info(f"""compress_file -> {zip_local_file_path} -> Done""")
-    return zip_local_file_path
+    logging.info(f"""compress_file -> {gz_local_file_path} -> Done""")
+    return gz_local_file_path
 
 
 if __name__ == "__main__":
@@ -52,13 +54,13 @@ if __name__ == "__main__":
     current_date = str(date.today())
 
     local_file_path = f"/home/dyab/projects/PacketX/traffic_log/{current_date}.csv"
-    zip_local_file_path = compress_file(local_file_path)
+    gz_local_file_path = compress_file(local_file_path)
 
     s3_bucket_name = "log-storage-bucket-v1"
-    s3_object_key = "lakehouse/raw_data_upload/" + zip_local_file_path.split('/')[-1]
+    s3_object_key = "lakehouse/raw_data_upload/" + gz_local_file_path.split('/')[-1]
 
-    upload_file_to_s3(zip_local_file_path, s3_bucket_name, s3_object_key)
+    upload_file_to_s3(gz_local_file_path, s3_bucket_name, s3_object_key)
 
-    os.remove(zip_local_file_path)
-    logging.info(f"""Main -> {zip_local_file_path} -> Removed""")
+    os.remove(gz_local_file_path)
+    logging.info(f"""Main -> {gz_local_file_path} -> Removed""")
     logging.info(f"""Main -> Done""")
