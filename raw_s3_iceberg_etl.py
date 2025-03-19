@@ -3,8 +3,43 @@ from pyiceberg.schema import Schema
 from pyiceberg.types import NestedField, IntegerType, StringType, FloatType, TimestampType
 from pyiceberg.partitioning import PartitionSpec, PartitionField
 from pyiceberg.transforms import DayTransform
+import pyarrow as pa
+import pyarrow.csv as pc
 import logging
 import os
+
+
+def read_csv_file(csv_file_path):
+    logging.info(f"""read_csv_file""")
+
+    if not os.path.exists(csv_file_path):
+        logging.info(f"""read_csv_file -> CSV file not found: {csv_file_path}""")
+        raise FileNotFoundError(f"CSV file not found: {csv_file_path}")
+    
+
+    arrow_schema = pa.schema(
+        [
+            pa.field("user_id", pa.int32(), nullable=True),
+            pa.field("time_stamp", pa.timestamp('us'), nullable=False),
+            pa.field("source_ip", pa.string(), nullable=True),
+            pa.field("destination_ip", pa.string(), nullable=True),
+            pa.field("bandwidth_per_ip_kb", pa.float32(), nullable=True),
+        ]
+    )
+
+    convert_options = pc.ConvertOptions(
+        column_types=arrow_schema,
+        strings_can_be_null=True,
+        null_values=["", "NULL"]
+    )
+    df = pc.read_csv(csv_file_path, convert_options=convert_options)
+
+                       
+    logging.info(f"""read_csv_file -> Done""")
+    return df
+
+    
+
 
 
 
@@ -13,12 +48,20 @@ def create_raw_schema(catalog, name_space, table_name):
 
     catalog.create_namespace_if_not_exists(name_space)
 
+    if catalog.table_exists(f"{name_space}.{table_name}"):
+        logging.info(f"""create_raw_schema -> Table <{table_name}> Already Created Before""")
+        logging.info(f"""create_raw_schema -> Done""")
+        return
+
+    
     schema = Schema(
         NestedField(field_id=1, name='user_id', field_type = IntegerType(), required=False),
         NestedField(field_id=2, name='time_stamp', field_type = TimestampType(), required=True),
         NestedField(field_id=3, name='source_ip', field_type = StringType(), required=True),
         NestedField(field_id=4, name='destination_ip', field_type = StringType(), required=True),
-        NestedField(field_id=5, name='bandwidth_kb', field_type = FloatType(), required=True)
+        NestedField(field_id=5, name='bandwidth_kb', field_type = FloatType(), required=True),
+
+        identifier_field_ids=[2, 3, 4]  # primary-key
     )
 
     partition_spec = PartitionSpec(
@@ -36,8 +79,8 @@ def create_raw_schema(catalog, name_space, table_name):
         partition_spec=partition_spec
     )
 
-    logging.info(f"""create_raw_schema -> iceberg_table.schema()""")
-    print(iceberg_table.schema())
+    # logging.info(f"""create_raw_schema -> iceberg_table.schema()""")
+    # print(iceberg_table.schema())
     logging.info(f"""create_raw_schema -> Done""")
 
 
@@ -45,8 +88,12 @@ def create_raw_schema(catalog, name_space, table_name):
 def load_local_sqlite_catalog():
     logging.info(f"""load_local_sqlite_catalog""")
 
+
+    catalog = load_catalog('lakehouse', **{
+        'uri': 'sqlite:///iceberg_catalog/catalog.db',
+        'warehouse': 'file://iceberg_catalog'
+    })
     os.environ['PYICEBERG_HOME'] = os.getcwd()
-    catalog = load_catalog(name='lakehouse')
 
 
     logging.info(f"""load_local_sqlite_catalog -> Done""")
@@ -61,5 +108,7 @@ if __name__ == "__main__":
     catalog = load_local_sqlite_catalog()
 
     create_raw_schema(catalog = catalog, name_space = 'PacketX_Raw', table_name = 'Packets')
+    read_csv_file('/home/dyab/projects/PacketX/traffic_log/2025-03-19.gz')
 
+    
     logging.info(f"""Main -> Done""")
