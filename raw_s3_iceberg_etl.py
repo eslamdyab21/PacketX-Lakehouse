@@ -6,12 +6,18 @@ from pyiceberg.transforms import DayTransform
 import pyarrow as pa
 import pyarrow.csv as pcsv
 import pyarrow.compute as pc
+import pyarrow.dataset as ds
 import logging
+import configparser
+from dotenv import load_dotenv
+from botocore.exceptions import ClientError
+from datetime import date
+import boto3
 import os
 
 
 
-def read_csv_file(csv_file_path):
+def read_local_csv_file(csv_file_path):
     logging.info(f"""read_csv_file""")
     
 
@@ -45,6 +51,30 @@ def read_csv_file(csv_file_path):
 
     return df
 
+
+
+def read_s3_csv_file(s3_object_key_path):
+    logging.info(f"""read_s3_csv_file""")
+
+    s3_client = boto3.client(
+        service_name='s3',
+        aws_access_key_id = os.getenv('aws_access_key_id'),
+        aws_secret_access_key = os.getenv('aws_secret_access_key')
+    )
+    bucket_name = os.getenv('s3_bucket_name')
+    
+    gz_file_name = str(date.today()) + '.gz'
+    file_key = s3_object_key_path + gz_file_name
+    
+
+    s3_client.download_file(bucket_name, file_key, gz_file_name)
+    logging.info(f"File <{file_key}> downloaded successfully ")
+
+
+    df = read_local_csv_file(gz_file_name)
+
+    logging.info(f"""read_s3_csv_file -> Done""")
+    return df
 
 
 def add_id_column(df):
@@ -158,12 +188,21 @@ if __name__ == "__main__":
     logging.basicConfig(level = "INFO")
     logging.info(f"""Main""")
 
+    # ----- Load .env and conf -----
+    load_dotenv()
+    config = configparser.ConfigParser()
+    config.read_file(open(r'conf'))
+    s3_object_key_path = config.get('Upload To S3', 's3_object_key_path')
+    # ----- Load .env and conf -----
+
+    
     catalog = load_local_sqlite_catalog()
 
-    create_raw_schema(catalog = catalog, name_space = 'PacketX_Raw', table_name = 'Packets')
-    iceberg_table = catalog.load_table("PacketX_Raw.Packets")
+    # create_raw_schema(catalog = catalog, name_space = 'PacketX_Raw', table_name = 'Packets')
+    # iceberg_table = catalog.load_table("PacketX_Raw.Packets")
 
-    df = read_csv_file('/home/dyab/projects/PacketX/traffic_log/2025-03-20.gz')
-    upsert_new_df(df, iceberg_table)
+    # df = read_local_csv_file('/home/dyab/projects/PacketX/traffic_log/2025-03-20.gz')
+    df = read_s3_csv_file(s3_object_key_path)
+    # upsert_new_df(df, iceberg_table)
     
     logging.info(f"""Main -> Done""")
