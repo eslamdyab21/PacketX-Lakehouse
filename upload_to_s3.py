@@ -1,4 +1,5 @@
 import boto3
+from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 import logging
 import gzip
@@ -22,11 +23,17 @@ def upload_file_to_s3(file_path, object_key):
     logging.info(f"""upload_file_to_s3 -> connected to S3 Client""")
 
     try:
-        # s3_client.upload_file(file_path, bucket_name, object_key)
+        s3_client.upload_file(file_path, bucket_name, object_key)
         logging.info(f"""upload_file_to_s3 -> File <{file_path}> uploaded to S3 bucket <{bucket_name}> as <{object_key}>""")
 
-    except:
-        logging.info(f"""upload_file_to_s3 -> Error Uploading""")
+    except ClientError as e:
+        logging.error(f"Error uploading file to S3: {e}")
+        raise
+    
+    except FileNotFoundError:
+        logging.error(f"Local file {local_file_path} not found")
+        raise
+
     
 
     logging.info(f"""upload_file_to_s3 -> Done""")
