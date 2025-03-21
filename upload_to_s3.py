@@ -54,28 +54,28 @@ def compress_file(local_file_path):
     return gz_local_file_path
 
 
+
 if __name__ == "__main__":
     logging.basicConfig(level = "INFO")
     logging.info(f"""Main""")
 
-    # Load .env and conf
+    # ----- Load .env and conf -----
     load_dotenv()
     config = configparser.ConfigParser()
     config.read_file(open(r'conf'))
     local_csv_dir_path = config.get('Upload To S3', 'local_csv_dir_path')
     s3_object_key_path = config.get('Upload To S3', 's3_object_key_path')
+    csv_file_name      = config.get('Upload To S3', 'csv_file_name')
+    # ----- Load .env and conf -----
 
 
-    current_date = str(date.today())
 
-    local_file_path = local_csv_dir_path + current_date + '.csv'
-
+    local_file_path = local_csv_dir_path + csv_file_name
     gz_local_file_path = compress_file(local_file_path)
 
-    
     s3_object_key = s3_object_key_path + gz_local_file_path.split('/')[-1]
-
     upload_file_to_s3(gz_local_file_path, s3_object_key)
+
 
     os.remove(gz_local_file_path)
     logging.info(f"""Main -> {gz_local_file_path} -> Removed""")
