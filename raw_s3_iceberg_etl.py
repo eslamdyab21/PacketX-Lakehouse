@@ -53,7 +53,7 @@ def read_local_csv_file(csv_file_path):
 
 
 
-def read_s3_csv_file(s3_object_key_path):
+def read_s3_csv_file(s3_object_key_path, gz_file_name):
     logging.info(f"""read_s3_csv_file""")
 
     s3_client = boto3.client(
@@ -63,7 +63,7 @@ def read_s3_csv_file(s3_object_key_path):
     )
     bucket_name = os.getenv('s3_bucket_name')
     
-    gz_file_name = str(date.today()) + '.gz'
+
     file_key = s3_object_key_path + gz_file_name
     
 
@@ -75,6 +75,7 @@ def read_s3_csv_file(s3_object_key_path):
 
     logging.info(f"""read_s3_csv_file -> Done""")
     return df
+
 
 
 def add_id_column(df):
@@ -162,8 +163,8 @@ def create_raw_schema(catalog, name_space, table_name):
         partition_spec=partition_spec
     )
 
-    # logging.info(f"""create_raw_schema -> iceberg_table.schema()""")
-    # print(iceberg_table.schema())
+    logging.info(f"""create_raw_schema -> iceberg_table.schema()""")
+    print(iceberg_table.schema())
     logging.info(f"""create_raw_schema -> Done""")
 
 
@@ -184,6 +185,33 @@ def load_local_sqlite_catalog():
 
 
 
+def load_s3_glue_catalog(s3_lakehouse_path, region_name):
+    logging.info("load_s3_glue_catalog")
+
+    s3_lakehouse_bucket = f"s3://{os.getenv('s3_bucket_name')}/{s3_lakehouse_path}"
+    
+    catalog = load_catalog(
+        'glue_lakehouse',
+        **{
+            "type": 'glue',
+            "s3.region": region_name,
+            "s3.access-key-id": os.getenv('aws_access_key_id'),
+            "s3.secret-access-key": os.getenv('aws_secret_access_key'),
+            "region_name": region_name,
+            "glue.region": region_name,
+            "glue.access-key-id": os.getenv('aws_access_key_id'),
+            "glue.secret-access-key": os.getenv('aws_secret_access_key'),
+            "aws_access_key_id": os.getenv('aws_access_key_id'),
+            "aws_secret_access_key": os.getenv('aws_secret_access_key'),
+            "warehouse": s3_lakehouse_bucket
+        }
+    )
+
+    logging.info("load_s3_glue_catalog -> Done")
+    return catalog
+
+
+
 if __name__ == "__main__":
     logging.basicConfig(level = "INFO")
     logging.info(f"""Main""")
@@ -193,16 +221,28 @@ if __name__ == "__main__":
     config = configparser.ConfigParser()
     config.read_file(open(r'conf'))
     s3_object_key_path = config.get('Upload To S3', 's3_object_key_path')
+    s3_lakehouse_path  = config.get('Raw S3 Iceberg Lakehouse ETL', 's3_lakehouse_path')
+    gz_file_name       = config.get('Raw S3 Iceberg Lakehouse ETL', 'gz_file_name')
+    region_name        = config.get('Raw S3 Iceberg Lakehouse ETL', 'region_name')
     # ----- Load .env and conf -----
 
     
-    catalog = load_local_sqlite_catalog()
-
+    # ----- SQL Lite Local Path -----
+    # catalog = load_local_sqlite_catalog()
     # create_raw_schema(catalog = catalog, name_space = 'PacketX_Raw', table_name = 'Packets')
     # iceberg_table = catalog.load_table("PacketX_Raw.Packets")
-
     # df = read_local_csv_file('/home/dyab/projects/PacketX/traffic_log/2025-03-20.gz')
-    df = read_s3_csv_file(s3_object_key_path)
     # upsert_new_df(df, iceberg_table)
+    # ----- SQL Lite Local Path -----
+
+
+    # ----- Glue Catalog S3 Path -----
+    catalog = load_s3_glue_catalog(s3_lakehouse_path, region_name)
+    create_raw_schema(catalog = catalog, name_space = 'PacketX_Raw', table_name = 'Packets')
+    iceberg_table = catalog.load_table("PacketX_Raw.Packets")
+    df = read_s3_csv_file(s3_object_key_path, gz_file_name)
+    upsert_new_df(df, iceberg_table)
+    # ----- Glue Catalog S3 Path -----
+
     
     logging.info(f"""Main -> Done""")
