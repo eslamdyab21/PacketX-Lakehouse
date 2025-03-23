@@ -118,8 +118,8 @@ def upsert_new_df(df, iceberg_table):
     logging.info(f"""upsert_new_df""")
 
     df = add_id_column(df)
-    iceberg_table.upsert(df, join_cols=["id"])
-    # iceberg_table.append(df)
+    # iceberg_table.upsert(df, join_cols=["id"])
+    iceberg_table.append(df)
 
     
     logging.info(f"""upsert_new_df -> Done""")
@@ -223,6 +223,7 @@ if __name__ == "__main__":
     s3_object_key_path = config.get('Upload To S3', 's3_object_key_path')
     s3_lakehouse_path  = config.get('Raw S3 Iceberg Lakehouse ETL', 's3_lakehouse_path')
     gz_file_name       = config.get('Raw S3 Iceberg Lakehouse ETL', 'gz_file_name')
+    local_gz_dir_path  = config.get('Raw S3 Iceberg Lakehouse ETL', 'local_gz_dir_path')
     region_name        = config.get('Raw S3 Iceberg Lakehouse ETL', 'region_name')
     # ----- Load .env and conf -----
 
@@ -231,7 +232,7 @@ if __name__ == "__main__":
     # catalog = load_local_sqlite_catalog()
     # create_raw_schema(catalog = catalog, name_space = 'PacketX_Raw', table_name = 'Packets')
     # iceberg_table = catalog.load_table("PacketX_Raw.Packets")
-    # df = read_local_csv_file('/home/dyab/projects/PacketX/traffic_log/2025-03-20.gz')
+    # df = read_local_csv_file(local_gz_dir_path + gz_file_name)
     # upsert_new_df(df, iceberg_table)
     # ----- SQL Lite Local Path -----
 
