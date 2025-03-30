@@ -10,8 +10,9 @@ import pyarrow.dataset as ds
 import logging
 import configparser
 from dotenv import load_dotenv
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, BotoCoreError
 from datetime import date
+from decimal import Decimal
 import boto3
 import os
 
@@ -31,7 +32,7 @@ def aggregate_bandwidth_by_user(df, date):
         result_list.append(
             {
                 'user': user,
-                'total_bandwidth_kb': bandwidth,
+                'total_bandwidth_kb': int(bandwidth),
                 'date': date
             }
         )
@@ -40,6 +41,27 @@ def aggregate_bandwidth_by_user(df, date):
     print(result_list)
     logging.info("aggregate_bandwidth_by_user -> Done")
     return result_list
+
+
+
+
+def save_to_dynamodb(table, data):
+    logging.info(f"""save_to_dynamodb""")
+
+    try:
+        with table.batch_writer() as batch:
+            for item in data:
+                batch.put_item(Item={
+                    'user': item['user'],  # Partition Key
+                    'date': item['date'],  # Sort Key
+                    'total_bandwidth_kb':Decimal(item['total_bandwidth_kb'])  # Additional attribute
+                })
+        logging.info(f"""save_to_dynamodb -> Batch Write Successful""")
+    
+    except (BotoCoreError, ClientError) as e:
+        logging.info(f"""save_to_dynamodb -> Error Writing Batch to DynamoDB: {e}""")
+
+    logging.info(f"""save_to_dynamodb -> Done""")
 
 
 
@@ -56,6 +78,22 @@ def load_local_sqlite_catalog():
 
     logging.info(f"""load_local_sqlite_catalog -> Done""")
     return catalog
+
+
+
+def connect_to_dynamodb(aws_region, table_name):
+    logging.info(f"""connect_to_dynamodb""")
+    dynamodb_client = boto3.resource(
+        service_name='dynamodb',
+        aws_access_key_id = os.getenv('aws_access_key_id'),
+        aws_secret_access_key = os.getenv('aws_secret_access_key'),
+        region_name = aws_region
+    )
+
+    table = dynamodb_client.Table(table_name)
+
+    logging.info(f"""connect_to_dynamodb -> Done""")
+    return table
 
 
 
@@ -98,28 +136,33 @@ if __name__ == "__main__":
     s3_lakehouse_path  = config.get('Raw S3 Iceberg Lakehouse ETL', 's3_lakehouse_path')
     region_name        = config.get('Raw S3 Iceberg Lakehouse ETL', 'region_name')
     filter_date        = config.get('DynamoDB ETL', 'filter_date')
+    table_name         = config.get('DynamoDB ETL', 'table_name')
     # ----- Load .env and conf -----
 
     
     # ----- SQL Lite Local Path -----
-    # catalog = load_local_sqlite_catalog()
-    # iceberg_table = catalog.load_table("PacketX_Raw.Packets")
-
-    # start_time = f"{filter_date}T00:00:00"
-    # end_time   = f"{filter_date}T23:59:59"
-    # filtered_day_table = iceberg_table.scan(row_filter=f"time_stamp >= '{start_time}' AND time_stamp <= '{end_time}'")
-    # aggregate_bandwidth_by_user(filtered_day_table.to_arrow(), filter_date)
-    # ----- SQL Lite Local Path -----
-
-
-    # ----- Glue Catalog S3 Path -----
-    catalog = load_s3_glue_catalog(s3_lakehouse_path, region_name)
+    catalog = load_local_sqlite_catalog()
     iceberg_table = catalog.load_table("PacketX_Raw.Packets")
+    table = connect_to_dynamodb(aws_region = region_name, table_name = table_name)
 
     start_time = f"{filter_date}T00:00:00"
     end_time   = f"{filter_date}T23:59:59"
     filtered_day_table = iceberg_table.scan(row_filter=f"time_stamp >= '{start_time}' AND time_stamp <= '{end_time}'")
-    aggregate_bandwidth_by_user(filtered_day_table.to_arrow(), filter_date)
+    aggregated_data = aggregate_bandwidth_by_user(filtered_day_table.to_arrow(), filter_date)
+    save_to_dynamodb(table = table , data = aggregated_data)
+    # ----- SQL Lite Local Path -----
+
+
+    # ----- Glue Catalog S3 Path -----
+    # catalog = load_s3_glue_catalog(s3_lakehouse_path, region_name)
+    # iceberg_table = catalog.load_table("PacketX_Raw.Packets")
+    # table = connect_to_dynamodb(aws_region = region_name, table_name = table_name)
+    
+    # start_time = f"{filter_date}T00:00:00"
+    # end_time   = f"{filter_date}T23:59:59"
+    # filtered_day_table = iceberg_table.scan(row_filter=f"time_stamp >= '{start_time}' AND time_stamp <= '{end_time}'")
+    # aggregated_data = aggregate_bandwidth_by_user(filtered_day_table.to_arrow(), filter_date)
+    # save_to_dynamodb(table = table , data = aggregated_data)
     # ----- Glue Catalog S3 Path -----
 
     
