@@ -12,4 +12,5 @@ region_name = eu-north-1
 
 
 [DynamoDB ETL]
-filter_date = 2025-03-22
+filter_date = 2025-03-23
+table_name = daily_aggregate 
