@@ -1,4 +1,4 @@
-![](images/diagram-export-4-1-2025-6_34_08-PM.png)
+![](images/diagram-export-4-1-2025-6_41_43-PM.png)
 
 # **📡 Introduction**
 PacketX Lakehouse is a Cloud & Local based medium-sized data platform designed to handle and analyze network packets traffic data.The project follows a modern medium-sized lakehouse architecture, integrating **Apache Iceberg, AWS S3 Bucket Storage, DynamoDB, and Redshift**.
