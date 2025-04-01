@@ -29,7 +29,7 @@ dyab-2025-03-22.csv  dyab-2025-03-25.csv  dyab-2025-03-28.csv
 
 So we can setup a `cronjob` to upload the day data at the end of each day or invoke the script manually.
 
-### To AWS S3
+#### To AWS S3
 A script `upload_to_s3.py` is used to upload relevant day raw data to S3, it basically connects to S3 Bucket with `boto3 module` with credintails in the `.env` file and configurations in the `conf` file.
 
 - An example of the `.env` structure:
@@ -61,7 +61,7 @@ Now, to have the ability to query the raw data and process it further in the pip
 
 The traditional route with `Iceberg` is to use it on big data with tools like `spark`, but in this project since the data volume is small to mid, we won't use it with `spark`, we will use `pandas` and `pyarrow` with the relatively new `Pyiceberg` which is a Python implementation for accessing Iceberg tables without the need of a JVM.
 
-### To AWS With Glue Catalog and S3
+#### To AWS With Glue Catalog and S3
 An ETL script `raw_s3_iceberg_etl.py` is used to process relevant day raw data from `lakehouse/raw_data_upload/` to `iceberg` table format in `lakehouse/iceberg` in `S3`, with `PacketX_Raw` namespace and a `Packets` table.
 
 - The `.env` remains the same:
@@ -100,7 +100,7 @@ upsert_new_df(df, iceberg_table)
 ![](images/s3_iceberg.png)
 
 
-### To Local With SQLLite Catalog
+#### To Local With SQLLite Catalog
 Same `.env`, `conf`, and ETL script is used, the only difference is with catalog function and and reading the raw data.
 ```python
 # ----- SQL Lite Local Path -----
@@ -113,3 +113,49 @@ upsert_new_df(df, iceberg_table)
 ```
 
 ![](images/iceberg_packets_table.png)
+
+<br/>
+
+## 3. Aggregate daily to AWS DynamoDB
+An ETL script `dynamodb_etl.py` is used to aggregate relevant day raw data from `iceberg` `lakehouse/iceberg` in `S3` `Packets` table.
+
+- The `.env` remains the same:
+```python
+aws_access_key_id='SSSSSSSSSSSSSSSSSSSSS'
+aws_secret_access_key='SSSSSSSSSSSSSSSSSSSSSSSS'
+s3_bucket_name='bucket-name'
+```
+
+- The `conf` structure will have new configurations:
+```python
+[Upload To S3]
+local_csv_dir_path = /home/dyab/projects/PacketX/traffic_log/
+s3_object_key_path = lakehouse/raw_data_upload/
+csv_file_name = dyab-2025-03-23.csv
+
+[Raw S3 Iceberg Lakehouse ETL]
+local_gz_dir_path = /home/dyab/projects/PacketX/traffic_log/
+s3_lakehouse_path = lakehouse/iceberg
+gz_file_name = dyab-2025-03-23.gz
+region_name = eu-north-1
+
+[DynamoDB ETL]
+filter_date = 2025-03-23
+table_name = daily_aggregate 
+```
+
+- The main flow of the ETL
+```python
+# ----- Glue Catalog S3 Path -----
+catalog = load_s3_glue_catalog(s3_lakehouse_path, region_name)
+iceberg_table = catalog.load_table("PacketX_Raw.Packets")
+table = connect_to_dynamodb(aws_region = region_name, table_name = table_name)
+
+filtered_day_table = filter_day(iceberg_table)
+aggregated_data = aggregate_bandwidth_by_user(filtered_day_table.to_arrow(), filter_date)
+save_to_dynamodb(table = table , data = aggregated_data)
+# ----- Glue Catalog S3 Path -----
+```
+![](images/dynamodb_aws_script.png)
+
+![](images/dynamodb_aws.png)
