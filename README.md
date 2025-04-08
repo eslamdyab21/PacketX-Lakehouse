@@ -119,7 +119,7 @@ upsert_new_df(df, iceberg_table)
 
 
 ## 3. Postgres & Redshift Warehouse ETL
-An ETL script `warehouse_etl.py` is used to aggregate relevant day raw data from `iceberg` `lakehouse/iceberg` in `S3` `Packets` table or from locally iceberg table to the warehouse `fact` and `dimensions` tables.
+An ETL script `warehouse_etl.py` is used to aggregate relevant day raw data from `iceberg` `lakehouse/iceberg` in `S3` `Packets` table or from local iceberg table to the warehouse's `fact` and `dimensions` tables.
 
 Both `Pyarrow` and `Duckdb` are used for the ETL pipeline.
 
@@ -133,10 +133,94 @@ con.sql("SELECT * FROM lakehouse_packets").show()
 
 ![](images/duckdb_wh_lh.png)
 
-#### Warehouse Schema
+<br/>
+
+### Warehouse Schema
 <!-- ![](images/iceberg_packets_table.png) -->
 
 You can find the `.sql` files for the schema inside `warehouse-migrations` directory for both `postgres` and `redshift` with related connection configurations. It was done with `flyway` sql lite-weight migrations tool.
+
+<br/>
+
+### Warehouse ETL
+Raw `sql` etl queries are used for this part, you can find the sql scripts inside the `warehouse_etl_sql_queries` directory, one for each table in the warehouse.
+
+The scripts are accessed in `python` to `Duckdb` to execute them.
+
+#### Date Dimension
+- `warehouse_etl_sql_queries/date_dim_etl.sql`, `Duckdb` doesn't support `MERGE` command as of yet, so I took another approach for thr `upsert`.
+
+```sql
+WITH staging_table AS (
+    SELECT DISTINCT 
+        CAST(strftime(time_hour, '%Y%m%d%H') AS INTEGER) AS date_key,
+        CAST(time_hour AS DATE)                        AS date,
+        EXTRACT(YEAR FROM time_hour)                   AS year,
+        EXTRACT(QUARTER FROM time_hour)                AS quarter,
+        EXTRACT(MONTH FROM time_hour)                  AS month,
+        EXTRACT(WEEK FROM time_hour)                   AS week,
+        EXTRACT(DAY FROM time_hour)                    AS day,
+        EXTRACT(HOUR FROM time_hour)                   AS hour,
+        CASE 
+            WHEN EXTRACT(ISODOW FROM time_hour) IN (6, 7) THEN TRUE
+            ELSE FALSE
+        END AS is_weekend
+    FROM lakehouse_packets
+)
+
+
+INSERT INTO date_dim (
+    date_key, 
+    date, 
+    year, 
+    quarter,
+    month,
+    week,
+    day,
+    hour,
+    is_weekend
+)
+SELECT 
+    staging_table.date_key,
+    staging_table.date,
+    staging_table.year,
+    staging_table.quarter,
+    staging_table.month,
+    staging_table.week,
+    staging_table.day,
+    staging_table.hour,
+    staging_table.is_weekend
+FROM staging_table
+LEFT JOIN date_dim
+    ON staging_table.date_key = date_dim.date_key 
+    AND date_dim.date = ?::DATE 
+WHERE date_dim.date_key IS NULL
+```
+
+- `date_dim.date = ?::DATE ` is important because it avoids scanning all the table, and this `?` symbol is a placeholder interpreted by `Duckdb` to safely dynamically pass filter_date without the risk of `sql injection`.
+
+
+<br/>
+
+#### Ip Dimension
+- `warehouse_etl_sql_queries/ip_dim_etl.sql`
+
+```sql
+-- Get unique Ips
+WITH staging_table AS (
+    SELECT source_ip AS ip FROM lakehouse_packets WHERE source_ip IS NOT NULL
+    UNION
+    SELECT destination_ip AS ip FROM lakehouse_packets WHERE source_ip IS NOT NULL
+)
+
+
+-- Upsert
+INSERT INTO ip_dim (ip_address)
+SELECT staging_table.ip AS ip_address FROM staging_table
+LEFT JOIN ip_dim ON ip_dim.ip_address = staging_table.ip
+WHERE ip_dim.ip_address IS NULL
+```
+
 
 
 
