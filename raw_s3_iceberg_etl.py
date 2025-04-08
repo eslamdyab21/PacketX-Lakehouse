@@ -85,7 +85,7 @@ def add_id_column(df):
     row_numbers = pa.array(range(1, num_rows + 1), type=pa.int32())
 
     # Convert time_stamp to string using strftime
-    time_strings = pc.strftime(df["time_stamp"], format="%Y-%m-%d %H:%M:%S")
+    time_strings = pc.strftime(df["time_stamp"], format="%Y-%m-%d %H:%M")
 
     # Convert row numbers to strings
     row_number_strings = pc.cast(row_numbers, pa.string())
@@ -217,6 +217,7 @@ if __name__ == "__main__":
     logging.info(f"""Main""")
 
     # ----- Load .env and conf -----
+    logging.info(f"""Main -> Load Conf and Envs""")
     load_dotenv()
     config = configparser.ConfigParser()
     config.read_file(open(r'conf'))
@@ -225,25 +226,27 @@ if __name__ == "__main__":
     gz_file_name       = config.get('Raw S3 Iceberg Lakehouse ETL', 'gz_file_name')
     local_gz_dir_path  = config.get('Raw S3 Iceberg Lakehouse ETL', 'local_gz_dir_path')
     region_name        = config.get('Raw S3 Iceberg Lakehouse ETL', 'region_name')
+    local_or_aws       = config.get('Raw S3 Iceberg Lakehouse ETL', 'local_or_aws')
+    logging.info(f"""Main -> Load Conf and Envs""")
     # ----- Load .env and conf -----
 
-    
-    # ----- SQL Lite Local Path -----
-    # catalog = load_local_sqlite_catalog()
-    # create_raw_schema(catalog = catalog, name_space = 'PacketX_Raw', table_name = 'Packets')
-    # iceberg_table = catalog.load_table("PacketX_Raw.Packets")
-    # df = read_local_csv_file(local_gz_dir_path + gz_file_name)
-    # upsert_new_df(df, iceberg_table)
-    # ----- SQL Lite Local Path -----
 
-
-    # ----- Glue Catalog S3 Path -----
-    catalog = load_s3_glue_catalog(s3_lakehouse_path, region_name)
-    create_raw_schema(catalog = catalog, name_space = 'PacketX_Raw', table_name = 'Packets')
-    iceberg_table = catalog.load_table("PacketX_Raw.Packets")
-    df = read_s3_csv_file(s3_object_key_path, gz_file_name)
-    upsert_new_df(df, iceberg_table)
-    # ----- Glue Catalog S3 Path -----
+    if local_or_aws == 'aws':
+        # ----- Glue Catalog S3 Path -----
+        catalog = load_s3_glue_catalog(s3_lakehouse_path, region_name)
+        create_raw_schema(catalog = catalog, name_space = 'PacketX_Raw', table_name = 'Packets')
+        iceberg_table = catalog.load_table("PacketX_Raw.Packets")
+        df = read_s3_csv_file(s3_object_key_path, gz_file_name)
+        upsert_new_df(df, iceberg_table)
+        # ----- Glue Catalog S3 Path -----
+    else:
+        # ----- SQL Lite Local Path -----
+        catalog = load_local_sqlite_catalog()
+        create_raw_schema(catalog = catalog, name_space = 'PacketX_Raw', table_name = 'Packets')
+        iceberg_table = catalog.load_table("PacketX_Raw.Packets")
+        df = read_local_csv_file(local_gz_dir_path + gz_file_name)
+        upsert_new_df(df, iceberg_table)
+        # ----- SQL Lite Local Path -----
 
     
     logging.info(f"""Main -> Done""")
