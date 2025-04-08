@@ -16,7 +16,7 @@ WITH staging_table AS (
 )
 
 
-INSERT INTO db.warehouse.date_dim (
+INSERT INTO date_dim (
     date_key, 
     date, 
     year, 
@@ -27,10 +27,18 @@ INSERT INTO db.warehouse.date_dim (
     hour,
     is_weekend
 )
-SELECT * 
-    FROM staging_table 
-    WHERE
-        staging_table.date_key NOT IN (
-            SELECT date_key FROM db.warehouse.date_dim 
-            WHERE date = ?::DATE 
-        )
+SELECT 
+    staging_table.date_key,
+    staging_table.date,
+    staging_table.year,
+    staging_table.quarter,
+    staging_table.month,
+    staging_table.week,
+    staging_table.day,
+    staging_table.hour,
+    staging_table.is_weekend
+FROM staging_table
+LEFT JOIN date_dim
+    ON staging_table.date_key = date_dim.date_key 
+    AND date_dim.date = ?::DATE 
+WHERE date_dim.date_key IS NULL
