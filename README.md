@@ -56,7 +56,7 @@ The scripts will first compress the csv file to `.gz` then upload to S3
 
 <br/>
 
-## 2. Raw Data Table Format
+## 2. Lakehouse Raw Data Table Format
 Now, to have the ability to query the raw data and process it further in the pipeline, we will use `Iceberg` which will allow us to do just that and more with its efficient storage in `parquet` format, `ACID` transactions, partitioning, and `metadata` fast performance analytical queries. 
 
 The traditional route with `Iceberg` is to use it on big data with tools like `spark`, but in this project since the data volume is small to mid, we won't use it with `spark`, we will use `pandas` and `pyarrow` with the relatively new `Pyiceberg` which is a Python implementation for accessing Iceberg tables without the need of a JVM.
@@ -116,7 +116,33 @@ upsert_new_df(df, iceberg_table)
 
 <br/>
 
-## 3. Aggregate daily to AWS DynamoDB
+
+
+## 3. Postgres & Redshift Warehouse ETL
+An ETL script `warehouse_etl.py` is used to aggregate relevant day raw data from `iceberg` `lakehouse/iceberg` in `S3` `Packets` table or from locally iceberg table to the warehouse `fact` and `dimensions` tables.
+
+Both `Pyarrow` and `Duckdb` are used for the ETL pipeline.
+
+Example of reading `flyway_schema_history` changes from `postgres`, and raw lakehouse data table from `iceberg` with `pyarrow`
+
+```python
+con.sql("SELECT * FROM db.warehouse.flyway_schema_history").show()
+
+con.sql("SELECT * FROM lakehouse_packets").show()
+```
+
+![](images/duckdb_wh_lh.png)
+
+#### Warehouse Schema
+<!-- ![](images/iceberg_packets_table.png) -->
+
+You can find the `.sql` files for the schema inside `warehouse-migrations` directory for both `postgres` and `redshift` with related connection configurations. It was done with `flyway` sql lite-weight migrations tool.
+
+
+
+<br/>
+
+## 4. AWS DynamoDB ETL
 An ETL script `dynamodb_etl.py` is used to aggregate relevant day raw data from `iceberg` `lakehouse/iceberg` in `S3` `Packets` table.
 
 - The `.env` remains the same:
