@@ -19,6 +19,16 @@ def date_dim_etl(con, sql_base_path, filter_date):
 
 
 
+def date_ip_etl(con, sql_base_path):
+    logging.info(f"""date_dim_etl""")
+
+    sql_query = Path(sql_base_path + '/ip_dim_etl.sql').read_text()
+    con.execute(sql_query)
+
+    logging.info(f"""date_dim_etl -> Done""")
+
+
+
 def aggregate_by_hour(table):
     logging.info(f"""aggregate_by_hour""")
 
@@ -52,6 +62,9 @@ def connect_to_postgres_wh():
             password={os.getenv("POSTGRES_PASSWORD")}  
         ' AS db (TYPE postgres);  
     """)
+
+    # Set default schema path to db.warehouse
+    con.sql("SET search_path = db.warehouse;")
 
 
     logging.info(f"""connect_to_postgres_wh -> Done""")
@@ -92,5 +105,6 @@ if __name__ == "__main__":
         con.register("lakehouse_packets", filtered_day_table)
 
         date_dim_etl(con, sql_base_path, filter_date)
+        date_ip_etl(con, sql_base_path)
         con.close()
         # ----- SQL Lite Local Path -----
