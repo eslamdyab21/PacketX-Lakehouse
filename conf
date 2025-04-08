@@ -20,3 +20,4 @@ table_name = daily_aggregate
 [Warehouse ETL]
 local_or_aws = local
 filter_date = 2025-03-24
+sql_base_path = warehouse_etl_sql_queries/
