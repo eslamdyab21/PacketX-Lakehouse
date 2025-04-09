@@ -42,6 +42,16 @@ def users_dim_etl(con, sql_base_path):
 
 
 
+def direction_dim_etl(con, sql_base_path):
+    logging.info(f"""direction_dim_etl""")
+
+    sql_query = Path(sql_base_path + '/direction_dim_etl.sql').read_text()
+    con.execute(sql_query)
+
+    logging.info(f"""direction_dim_etl -> Done""")
+
+
+
 def aggregate_by_hour(table):
     logging.info(f"""aggregate_by_hour""")
 
@@ -120,5 +130,6 @@ if __name__ == "__main__":
         date_dim_etl(con, sql_base_path, filter_date)
         ip_dim_etl(con, sql_base_path)
         users_dim_etl(con, sql_base_path)
+        direction_dim_etl(con, sql_base_path)
         con.close()
         # ----- SQL Lite Local Path -----
