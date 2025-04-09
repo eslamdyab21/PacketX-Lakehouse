@@ -1,6 +1,6 @@
 CREATE TABLE users_dim(
     user_key              SERIAL        PRIMARY KEY,
-    user_name             VARCHAR(20)   UNIQUE NOT NULL,
+    user_name             VARCHAR(20)   NOT NULL,
     local_ip              VARCHAR(15),
 
     -- scd type2
