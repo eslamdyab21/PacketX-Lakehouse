@@ -29,14 +29,14 @@ def ip_dim_etl(con, sql_base_path):
 
 
 
-def users_dim_etl(con, sql_base_path, filter_date):
+def users_dim_etl(con, sql_base_path):
     logging.info(f"""users_dim_etl""")
 
     sql_query = Path(sql_base_path + '/users_dim_etl_update.sql').read_text()
-    con.execute(sql_query, [filter_date, filter_date])
+    con.execute(sql_query)
 
     sql_query = Path(sql_base_path + '/users_dim_etl_insert.sql').read_text()
-    con.execute(sql_query, [filter_date, filter_date])
+    con.execute(sql_query)
 
     logging.info(f"""users_dim_etl -> Done""")
 
@@ -119,6 +119,6 @@ if __name__ == "__main__":
 
         date_dim_etl(con, sql_base_path, filter_date)
         ip_dim_etl(con, sql_base_path)
-        users_dim_etl(con, sql_base_path, filter_date)
+        users_dim_etl(con, sql_base_path)
         con.close()
         # ----- SQL Lite Local Path -----
