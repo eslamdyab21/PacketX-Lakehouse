@@ -137,33 +137,34 @@ if __name__ == "__main__":
     region_name        = config.get('Raw S3 Iceberg Lakehouse ETL', 'region_name')
     filter_date        = config.get('DynamoDB ETL', 'filter_date')
     table_name         = config.get('DynamoDB ETL', 'table_name')
+    local_or_aws       = config.get('DynamoDB ETL', 'table_name')
     # ----- Load .env and conf -----
 
+    if local_or_aws == 'aws':
+        # ----- Glue Catalog S3 Path -----
+        catalog = load_s3_glue_catalog(s3_lakehouse_path, region_name)
+        iceberg_table = catalog.load_table("PacketX_Raw.Packets")
+        table = connect_to_dynamodb(aws_region = region_name, table_name = table_name)
+        
+        start_time = f"{filter_date}T00:00:00"
+        end_time   = f"{filter_date}T23:59:59"
+        filtered_day_table = iceberg_table.scan(row_filter=f"time_stamp >= '{start_time}' AND time_stamp <= '{end_time}'")
+        aggregated_data = aggregate_bandwidth_by_user(filtered_day_table.to_arrow(), filter_date)
+        save_to_dynamodb(table = table , data = aggregated_data)
+        # ----- Glue Catalog S3 Path -----
+    else:
+        # ----- SQL Lite Local Path -----
+        catalog = load_local_sqlite_catalog()
+        iceberg_table = catalog.load_table("PacketX_Raw.Packets")
+
+        start_time = f"{filter_date}T00:00:00"
+        end_time   = f"{filter_date}T23:59:59"
+        filtered_day_table = iceberg_table.scan(row_filter=f"time_stamp >= '{start_time}' AND time_stamp <= '{end_time}'")
+        aggregated_data = aggregate_bandwidth_by_user(filtered_day_table.to_arrow(), filter_date)
+        # ----- SQL Lite Local Path -----
+
+
     
-    # ----- SQL Lite Local Path -----
-    catalog = load_local_sqlite_catalog()
-    iceberg_table = catalog.load_table("PacketX_Raw.Packets")
-    table = connect_to_dynamodb(aws_region = region_name, table_name = table_name)
-
-    start_time = f"{filter_date}T00:00:00"
-    end_time   = f"{filter_date}T23:59:59"
-    filtered_day_table = iceberg_table.scan(row_filter=f"time_stamp >= '{start_time}' AND time_stamp <= '{end_time}'")
-    aggregated_data = aggregate_bandwidth_by_user(filtered_day_table.to_arrow(), filter_date)
-    save_to_dynamodb(table = table , data = aggregated_data)
-    # ----- SQL Lite Local Path -----
-
-
-    # ----- Glue Catalog S3 Path -----
-    # catalog = load_s3_glue_catalog(s3_lakehouse_path, region_name)
-    # iceberg_table = catalog.load_table("PacketX_Raw.Packets")
-    # table = connect_to_dynamodb(aws_region = region_name, table_name = table_name)
-    
-    # start_time = f"{filter_date}T00:00:00"
-    # end_time   = f"{filter_date}T23:59:59"
-    # filtered_day_table = iceberg_table.scan(row_filter=f"time_stamp >= '{start_time}' AND time_stamp <= '{end_time}'")
-    # aggregated_data = aggregate_bandwidth_by_user(filtered_day_table.to_arrow(), filter_date)
-    # save_to_dynamodb(table = table , data = aggregated_data)
-    # ----- Glue Catalog S3 Path -----
 
     
     logging.info(f"""Main -> Done""")
