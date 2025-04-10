@@ -3,7 +3,12 @@ WITH staging_table AS (
     SELECT 
         u.user_key,
         ips.ip_key as source_ip_key,
-        ipd.ip_key as dest_ip_key,
+        ipd.ip_key as destination_ip_key,
+        CASE 
+            WHEN lp.source_ip      NOT LIKE '192.168%' THEN ips.ip_key
+            WHEN lp.destination_ip NOT LIKE '192.168%' THEN ipd.ip_key
+            ELSE NULL
+        END AS external_ip_key,
         CAST(strftime(time_hour, '%Y%m%d%H') AS INTEGER) AS date_key,
         CASE 
             WHEN lp.source_ip = u.local_ip THEN d_in.direction_key
@@ -25,22 +30,27 @@ new_packets AS (
     SELECT 
         staging_table.user_key,
         staging_table.source_ip_key,
-        staging_table.dest_ip_key,
+        staging_table.destination_ip_key,
+        staging_table.external_ip_key,
         staging_table.date_key,
         staging_table.direction_key,
         staging_table.kb_bandwidth
     FROM 
         staging_table
-    LEFT JOIN packets_fact ON packets_fact.date_key = staging_table.date_key
-                          AND packets_fact.user_key = staging_table.user_key
+    LEFT JOIN packets_fact ON packets_fact.date_key           = staging_table.date_key
+                          AND packets_fact.user_key           = staging_table.user_key
+                          AND packets_fact.source_ip_key      = staging_table.source_ip_key
+                          AND packets_fact.destination_ip_key = staging_table.destination_ip_key
     WHERE packets_fact.date_key IS NULL
+    ORDER BY staging_table.kb_bandwidth DESC
 )
 
 
 INSERT INTO packets_fact (
     user_key, 
     source_ip_key, 
-    dest_ip_key, 
+    destination_ip_key,
+    external_ip_key,
     date_key, 
     direction_key, 
     kb_bandwidth
