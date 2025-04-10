@@ -147,8 +147,50 @@ Raw `sql` etl queries are used for this part, you can find the sql scripts insid
 
 The scripts are accessed in `python` to `Duckdb` to execute them.
 
+- The `.env`:
+```python
+POSTGRES_USER='packetx'
+POSTGRES_PASSWORD='password'
+POSTGRES_NAME='PacketX'
+POSTGRES_HOST='localhost'
+POSTGRES_PORT='5432'
+```
+
+- The `conf` structure will have new configurations:
+```python
+[Warehouse ETL]
+local_or_aws = local
+filter_date = 2025-03-23
+sql_base_path = warehouse_etl_sql_queries/
+```
+
+- The main flow of the ETL
+```python
+# ----- Local Path -----
+catalog = load_local_sqlite_catalog()
+iceberg_table = catalog.load_table("PacketX_Raw.Packets")
+con = connect_to_postgres_wh()
+
+start_time = f"{filter_date}T00:00:00"
+end_time   = f"{filter_date}T23:59:59"
+filtered_day_table = iceberg_table.scan(row_filter=f"time_stamp >= '{start_time}' AND time_stamp <= '{end_time}'")
+filtered_day_table = aggregate_by_hour(filtered_day_table.to_arrow())
+
+con.register("lakehouse_packets", filtered_day_table)
+
+date_dim_etl(con, sql_base_path, filter_date)
+ip_dim_etl(con, sql_base_path)
+users_dim_etl(con, sql_base_path)
+direction_dim_etl(con, sql_base_path)
+packets_fact_etl(con, sql_base_path)
+con.close()
+# ----- Local Path -----
+```
+
+<br/>
+
 #### Date Dimension
-- `warehouse_etl_sql_queries/date_dim_etl.sql`, `Duckdb` doesn't support `MERGE` command as of yet, so I took another approach for thr `upsert`.
+- `warehouse_etl_sql_queries/date_dim_etl.sql`, `Duckdb` doesn't support `MERGE` command as of yet, so I took another approach for the `upsert`.
 
 ```sql
 WITH staging_table AS (
@@ -222,7 +264,126 @@ WHERE ip_dim.ip_address IS NULL
 ```
 
 
+<br/>
 
+#### Users Dimension
+- `warehouse_etl_sql_queries/users_dim_etl.sql`
+Here it's a bit different because we track changes of user local ip as a slowly changing dimension type2 `SCD Type2`.
+
+```sql
+-- New batch data
+WITH staging_table AS (
+    SELECT 
+        max(time_hour) as start_date,
+        user as user_name,
+        source_ip AS local_ip,
+    FROM lakehouse_packets
+    WHERE 
+        source_ip LIKE '192.168%'
+    GROUP BY user, source_ip
+    ORDER BY start_date DESC
+    LIMIT 1
+),
+
+
+-- Users that changed IP
+changed_users AS (
+    SELECT 
+        s.user_name,
+        s.local_ip,
+        s.start_date,
+        u.user_key
+    FROM staging_table s
+    LEFT JOIN users_dim u 
+        ON s.user_name = u.user_name AND u.current_flag = TRUE
+    WHERE u.local_ip IS DISTINCT FROM s.local_ip
+)
+
+
+-- Mark current_flag = FALSE for old records
+UPDATE users_dim
+SET 
+    end_date = (SELECT start_date FROM changed_users),
+    current_flag = FALSE
+FROM changed_users cu
+WHERE 
+    users_dim.user_key = cu.user_key
+    AND users_dim.current_flag = TRUE
+
+
+-- Insert new records for changed or new users
+INSERT INTO users_dim (
+    user_name,
+    local_ip,
+    start_date,
+    end_date,
+    current_flag
+)
+SELECT 
+    user_name,
+    local_ip,
+    start_date,
+    NULL,
+    TRUE
+FROM changed_users
+```
+
+
+<br/>
+
+#### Packets Fact
+- `warehouse_etl_sql_queries/packets_fact_etl.sql`
+
+```sql
+-- Prepare New batch data
+WITH staging_table AS (
+    SELECT 
+        u.user_key,
+        ips.ip_key as source_ip_key,
+        ipd.ip_key as dest_ip_key,
+        CAST(strftime(time_hour, '%Y%m%d%H') AS INTEGER) AS date_key,
+        CASE 
+            WHEN lp.source_ip = u.local_ip THEN d_in.direction_key
+            ELSE d_out.direction_key
+        END AS direction_key,
+        bandwidth_kb_sum AS kb_bandwidth
+    FROM 
+        lakehouse_packets lp
+    LEFT JOIN users_dim u         ON lp.user           = u.user_name AND u.current_flag = TRUE
+    LEFT JOIN ip_dim ips          ON lp.source_ip      = ips.ip_address
+    LEFT JOIN ip_dim ipd          ON lp.destination_ip = ipd.ip_address
+    LEFT JOIN direction_dim d_in  ON d_in.direction    = 'inbound'
+    LEFT JOIN direction_dim d_out ON d_out.direction   = 'outbound'
+),
+
+
+-- Compare with existing saved data to insert only new packets
+new_packets AS (
+    SELECT 
+        staging_table.user_key,
+        staging_table.source_ip_key,
+        staging_table.dest_ip_key,
+        staging_table.date_key,
+        staging_table.direction_key,
+        staging_table.kb_bandwidth
+    FROM 
+        staging_table
+    LEFT JOIN packets_fact ON packets_fact.date_key = staging_table.date_key
+                          AND packets_fact.user_key = staging_table.user_key
+    WHERE packets_fact.date_key IS NULL
+)
+
+
+INSERT INTO packets_fact (
+    user_key, 
+    source_ip_key, 
+    dest_ip_key, 
+    date_key, 
+    direction_key, 
+    kb_bandwidth
+)
+SELECT * FROM new_packets
+```
 
 <br/>
 
