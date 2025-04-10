@@ -1,5 +1,4 @@
-![](images/diagram-export-4-1-2025-7_18_17-PM.png)
-
+![](images/diagram-export-4-11-2025-12_30_22-AM.png)
 # **📡 Introduction**
 PacketX Lakehouse is a Cloud & Local based medium-sized data platform designed to handle and analyze network packets traffic data. The project follows a modern medium-sized lakehouse architecture, integrating **Apache Iceberg, AWS S3 Bucket Storage, DynamoDB, and Redshift**.
 
@@ -16,6 +15,8 @@ PacketX is a **lightweight high-performance software** for real-time capturing a
 
 
 # **🎬 Walk Through**
+![](images/airflow.png)
+
 ## 1. Upload Raw Data To Lakehouse
 `PacketX` project writes captured network traffic data periodically each one minute to the corresponding date csv file in a traffic_log directory.
 
@@ -397,6 +398,27 @@ INSERT INTO packets_fact (
 )
 SELECT * FROM new_packets
 ```
+
+<br/>
+
+#### Warehouse ETL Check
+![](images/wh_etl_test.png)
+- `warehouse_etl_sql_queries/test_wh_etl.sql`
+
+
+```sql
+-- Test: Count data before and after Insertion
+SELECT 'IP DIM COUNT' AS table, COUNT(*) AS count FROM ip_dim
+UNION ALL
+SELECT 'USER DIM COUNT', COUNT(*) FROM users_dim
+UNION ALL
+SELECT 'DATE DIM COUNT', COUNT(*) FROM date_dim
+UNION ALL
+SELECT 'DIRECTION DIM COUNT', COUNT(*) FROM direction_dim
+UNION ALL
+SELECT 'PACKETS FACT COUNT', COUNT(*) FROM packets_fact;
+```
+A simple indication that the pipeline worked as expected, the `test_wh_etl_before` and `test_wh_etl_after` should have different counts in normal day-to-day injection, it won't however have different data incase we run the pipeline twice or more in the same day, because the pipeline is idempotent.
 
 <br/>
 
