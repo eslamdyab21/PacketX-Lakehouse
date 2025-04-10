@@ -52,6 +52,16 @@ def direction_dim_etl(con, sql_base_path):
 
 
 
+def packets_fact_etl(con, sql_base_path):
+    logging.info(f"""packets_fact_etl""")
+
+    sql_query = Path(sql_base_path + '/packets_fact_etl.sql').read_text()
+    con.execute(sql_query)
+
+    logging.info(f"""packets_fact_etl -> Done""")
+
+
+
 def aggregate_by_hour(table):
     logging.info(f"""aggregate_by_hour""")
 
@@ -131,5 +141,6 @@ if __name__ == "__main__":
         ip_dim_etl(con, sql_base_path)
         users_dim_etl(con, sql_base_path)
         direction_dim_etl(con, sql_base_path)
+        packets_fact_etl(con, sql_base_path)
         con.close()
         # ----- SQL Lite Local Path -----
