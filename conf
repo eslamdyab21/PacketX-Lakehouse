@@ -1,23 +1,24 @@
 [Upload To S3]
 local_csv_dir_path = /home/dyab/projects/PacketX/traffic_log/
 s3_object_key_path = lakehouse/raw_data_upload/
-csv_file_name = dyab-2025-03-24.csv
-
+csv_file_name = dyab-2025-03-25.csv
+local_or_aws = local
 
 [Raw S3 Iceberg Lakehouse ETL]
 local_gz_dir_path = /home/dyab/projects/PacketX/traffic_log/
 s3_lakehouse_path = lakehouse/iceberg
-gz_file_name = dyab-2025-03-24.gz
+gz_file_name = dyab-2025-03-25.gz
 region_name = eu-north-1
 local_or_aws = local
 
 
 [DynamoDB ETL]
-filter_date = 2025-03-23
+filter_date = 2025-03-25
 table_name = daily_aggregate 
+local_or_aws = local
 
 
 [Warehouse ETL]
 local_or_aws = local
-filter_date = 2025-03-24
+filter_date = 2025-03-25
 sql_base_path = warehouse_etl_sql_queries/
