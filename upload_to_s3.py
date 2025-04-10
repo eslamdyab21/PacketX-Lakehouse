@@ -66,6 +66,7 @@ if __name__ == "__main__":
     local_csv_dir_path = config.get('Upload To S3', 'local_csv_dir_path')
     s3_object_key_path = config.get('Upload To S3', 's3_object_key_path')
     csv_file_name      = config.get('Upload To S3', 'csv_file_name')
+    local_or_aws       = config.get('Upload To S3', 'local_or_aws')
     # ----- Load .env and conf -----
 
 
@@ -74,9 +75,11 @@ if __name__ == "__main__":
     gz_local_file_path = compress_file(local_file_path)
 
     s3_object_key = s3_object_key_path + gz_local_file_path.split('/')[-1]
-    upload_file_to_s3(gz_local_file_path, s3_object_key)
 
-
-    os.remove(gz_local_file_path)
-    logging.info(f"""Main -> {gz_local_file_path} -> Removed""")
+    if local_or_aws == 'aws':
+        upload_file_to_s3(gz_local_file_path, s3_object_key)
+        os.remove(gz_local_file_path)
+        logging.info(f"""Main -> {gz_local_file_path} -> Removed""")
+    
+    
     logging.info(f"""Main -> Done""")
