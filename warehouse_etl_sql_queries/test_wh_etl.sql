@@ -1,0 +1,10 @@
+-- Test: Count data before and after Insertion
+SELECT 'IP DIM COUNT' AS table, COUNT(*) AS count FROM ip_dim
+UNION ALL
+SELECT 'USER DIM COUNT', COUNT(*) FROM users_dim
+UNION ALL
+SELECT 'DATE DIM COUNT', COUNT(*) FROM date_dim
+UNION ALL
+SELECT 'DIRECTION DIM COUNT', COUNT(*) FROM direction_dim
+UNION ALL
+SELECT 'PACKETS FACT COUNT', COUNT(*) FROM packets_fact;
